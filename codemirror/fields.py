@@ -13,7 +13,7 @@ class CodeMirrorField(models.TextField):
         return super(CodeMirrorField, self).formfield(**defaults)
 
 
-class CodeMirrorFormField(forms.fields.Field):
+class CodeMirrorFormField(forms.fields.CharField):
     def __init__(self, *args, **kwargs):
         kwargs.update({'widget': CodeMirrorTextarea})
         super(CodeMirrorFormField, self).__init__(*args, **kwargs)
