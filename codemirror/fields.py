@@ -14,13 +14,6 @@ class CodeMirrorField(models.TextField):
 
 
 class CodeMirrorFormField(forms.fields.CharField):
-    def __init__(self, *args, **kwargs):
-        kwargs.update({'widget': CodeMirrorTextarea})
+    def __init__(self, widget=CodeMirrorTextarea, *args, **kwargs):
+        kwargs.update({'widget': widget})
         super(CodeMirrorFormField, self).__init__(*args, **kwargs)
-
-try:
-    from south.modelsinspector import add_introspection_rules
-    add_introspection_rules([], ["^codemirror\.fields\.CodeMirrorField"])
-except:
-    pass
-

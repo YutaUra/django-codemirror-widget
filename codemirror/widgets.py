@@ -5,15 +5,15 @@
 #
 from itertools import chain
 import re
+import os
 
 import django
 from django import forms
 from django.conf import settings
 from django.utils.safestring import mark_safe
 
-
 from codemirror import utils
-
+from codemirror.addon.base import BaseAddon
 
 # set default settings
 CODEMIRROR_PATH = getattr(settings, 'CODEMIRROR_PATH', 'codemirror')
@@ -21,7 +21,7 @@ if CODEMIRROR_PATH.endswith('/'):
     CODEMIRROR_PATH = CODEMIRROR_PATH[:-1]
 CODEMIRROR_MODE = getattr(settings, 'CODEMIRROR_MODE', 'javascript')
 CODEMIRROR_THEME = getattr(settings, 'CODEMIRROR_THEME', 'default')
-CODEMIRROR_CONFIG = getattr(settings, 'CODEMIRROR_CONFIG', { 'lineNumbers': True })
+CODEMIRROR_CONFIG = getattr(settings, 'CODEMIRROR_CONFIG', {'lineNumbers': True})
 CODEMIRROR_JS_VAR_FORMAT = getattr(settings, 'CODEMIRROR_JS_VAR_FORMAT', None)
 
 THEME_CSS_FILENAME_RE = re.compile(r'[\w-]+')
@@ -34,21 +34,50 @@ class CodeMirrorTextarea(forms.Textarea):
         http://codemirror.net/
     """
 
+    # addon_set = set()
+    # dependency_set = set()
+
+    @property
+    def codemirror(self):
+        return f"{CODEMIRROR_PATH}/lib/codemirror.js"
+
+    def mode(self):
+        return f"{CODEMIRROR_PATH}/mode/{self.mode_name}/{self.mode_name}.js"
+
+    def solve_dependency(self):
+        html_file = os.path.join(settings.BASE_DIR, 'mirror', 'static', CODEMIRROR_PATH, 'mode', self.mode_name,
+                                 'index.html')
+        with open(html_file, 'r') as f:
+            text = f.read()
+        files = re.findall(r'<script\s+src="(.+js)"></script>', text)
+        for file in files:
+            if match := re.match(r'(?:\.\./)+addon/(\w+)/(\w+)', file):
+                addon = BaseAddon.get(*match.groups())
+                self.addon |= (addon.solve())
+            if match := re.match(r'\.\./(?P<dependency>\w+)/(?P=dependency).js', file):
+                depend = match.groups()[0]
+                self.dependencies.add(depend)
+
+    def handle_addon(self):
+        for addon in self.addon:
+            self.config.update(addon.config)
+
+    def keymap(self):
+        return "%s/keymap/%s.js" % (CODEMIRROR_PATH, self.keymap)
+
     @property
     def media(self):
-        mode_name = self.mode_name
-        js = ["%s/lib/codemirror.js" % CODEMIRROR_PATH]
+        js = [self.codemirror]
 
         if not self.custom_mode:
-            js.append("%s/mode/%s/%s.js" % (CODEMIRROR_PATH, mode_name, mode_name))
-
-        js.extend(
-            "%s/mode/%s/%s.js" % (CODEMIRROR_PATH, dependency, dependency)
-                for dependency in self.dependencies)
-        js.extend("%s/addon/%s.js" % (CODEMIRROR_PATH, addon) for addon in self.addon_js)
+            js.append(self.mode())
+        js.extend(f'{CODEMIRROR_PATH}/{a}' for a in self.addon_js)
+        js.extend(f'{CODEMIRROR_PATH}/{addon.path()}' for addon in self.addon)
+        js.extend("%s/mode/%s/%s.js" % (CODEMIRROR_PATH, dependency, dependency)
+                  for dependency in self.dependencies)
 
         if self.keymap:
-            js.append("%s/keymap/%s.js" % (CODEMIRROR_PATH, self.keymap))
+            js.append(self.keymap())
 
         if self.custom_js:
             js.extend(self.custom_js)
@@ -56,10 +85,14 @@ class CodeMirrorTextarea(forms.Textarea):
         css = ["%s/lib/codemirror.css" % CODEMIRROR_PATH]
         css.extend(
             "%s/theme/%s.css" % (CODEMIRROR_PATH, theme_css_filename)
-                for theme_css_filename in self.theme_css)
+            for theme_css_filename in self.theme_css)
         css.extend(
             "%s/addon/%s.css" % (CODEMIRROR_PATH, css_file)
-                for css_file in self.addon_css)
+            for css_file in self.addon_css)
+
+        css.extend(
+            f'{CODEMIRROR_PATH}/{addon.css_path()}' for addon in self.addon if addon.css
+        )
 
         if self.custom_css:
             css.extend(self.custom_css)
@@ -74,7 +107,7 @@ class CodeMirrorTextarea(forms.Textarea):
     def __init__(
             self, attrs=None, mode=None, theme=None, config=None, dependencies=(),
             js_var_format=None, addon_js=(), addon_css=(), custom_mode=None, custom_js=(),
-            keymap=None, custom_css=None, **kwargs):
+            keymap=None, custom_css=None):
         u"""Constructor of CodeMirrorTextarea
 
         Attribute:
@@ -133,20 +166,27 @@ class CodeMirrorTextarea(forms.Textarea):
             codemirror = CodeMirrorTextarea(mode="python", theme="cobalt", config={ 'fixedGutter': True })
             document = forms.TextField(widget=codemirror)
         """
-        super(CodeMirrorTextarea, self).__init__(attrs=attrs, **kwargs)
+        super(CodeMirrorTextarea, self).__init__(attrs=attrs)
 
         mode = mode or custom_mode or CODEMIRROR_MODE
-        if utils.isstring(mode):
-            mode = { 'name': mode }
+        if isinstance(mode, str):
+            mode = {'name': mode}
         self.mode_name = mode['name']
         self.custom_mode = custom_mode
-        self.dependencies = dependencies
-        self.addon_js = addon_js
-        self.addon_css = addon_css
+        self.dependencies = set(dependencies)
+        self.addon_js = set(filter(lambda x: isinstance(x, str), addon_js))
+        self.addon_css = set(filter(lambda x: isinstance(x, str), addon_css))
+        self.addon = set(
+            filter(lambda x: issubclass(x, BaseAddon) or isinstance(x, BaseAddon), tuple(addon_js) + tuple(addon_css)))
+        temp = set()
+        for add in self.addon:
+            temp |= add.solve()
+        self.addon |= temp
         self.custom_js = custom_js
         self.custom_css = custom_css
         self.keymap = keymap
         self.js_var_format = js_var_format or CODEMIRROR_JS_VAR_FORMAT
+        self.config = config or {}
 
         theme = theme or CODEMIRROR_THEME
         theme_css_filename = THEME_CSS_FILENAME_RE.search(theme).group(0)
@@ -155,10 +195,13 @@ class CodeMirrorTextarea(forms.Textarea):
         else:
             self.theme_css = [theme_css_filename]
 
-        config = config or {}
+        self.solve_dependency()
+
+        self.handle_addon()
+
         self.option_json = utils.CodeMirrorJSONEncoder().encode(dict(chain(
             CODEMIRROR_CONFIG.items(),
-            config.items(),
+            self.config.items(),
             [('mode', mode), ('theme', theme)])))
 
     def render(self, name, value, attrs=None, renderer=None):
@@ -174,7 +217,7 @@ class CodeMirrorTextarea(forms.Textarea):
             renderer_args = ()
 
         output = [super(CodeMirrorTextarea, self).render(
-                        name, value, attrs, *renderer_args),
+            name, value, attrs, *renderer_args),
             '<script type="text/javascript">%sCodeMirror.fromTextArea(document.getElementById(%s), %s);</script>' %
-                (js_var_bit, '"id_%s"' % name, self.option_json)]
+            (js_var_bit, '"id_%s"' % name, self.option_json)]
         return mark_safe('\n'.join(output))

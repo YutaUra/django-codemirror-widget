@@ -1,20 +1,22 @@
-django-codemirror-widget
+django-codemirror-widget-2
 =================================
-.. image:: https://img.shields.io/pypi/v/django-codemirror-widget.svg
-    :target: https://pypi.python.org/pypi/django-codemirror-widget/
+.. image:: https://img.shields.io/pypi/v/django-codemirror-widget-2.svg
+    :target: https://pypi.python.org/pypi/django-codemirror-widget-2/
     :alt: Version
 
-.. image:: https://img.shields.io/pypi/status/django-codemirror-widget.svg
-    :target: https://pypi.python.org/pypi/django-codemirror-widget/
+.. image:: https://img.shields.io/pypi/status/django-codemirror-widget-2.svg
+    :target: https://pypi.python.org/pypi/django-codemirror-widget-2/
     :alt: Status
 
-.. image:: https://img.shields.io/pypi/l/django-codemirror-widget.svg
-    :target: https://pypi.python.org/pypi/django-codemirror-widget/
+.. image:: https://img.shields.io/pypi/l/django-codemirror-widget-2.svg
+    :target: https://pypi.python.org/pypi/django-codemirror-widget-2/
     :alt: License
 
-.. image:: https://img.shields.io/pypi/pyversions/django-codemirror-widget.svg
-    :target: https://pypi.python.org/pypi/django-codemirror-widget/
+.. image:: https://img.shields.io/pypi/pyversions/django-codemirror-widget-2.svg
+    :target: https://pypi.python.org/pypi/django-codemirror-widget-2/
     :alt: Python versions
+
+This Package is wrapper of django-codemirror-widget
 
 `Django <https://www.djangoproject.com>`_ form widget library for using `CodeMirror <http://codemirror.net/>`_ on ``Textarea``.
 
@@ -23,7 +25,7 @@ Installation
 
 .. code:: sh
 
-    pip install django-codemirror-widget
+    pip install django-codemirror-widget-2
 
 
 

@@ -2,3 +2,8 @@
 /dist
 /*.egg-info
 *.pyc
+/static
+test_code
+manage.py
+mirror
+db.sqlite3
